@@ -39,10 +39,13 @@ namespace CorsAway.Controllers
             HttpClient httpClient = new HttpClient();
             HttpResponseMessage httpResponseMessage = await httpClient.GetAsync(new Uri(url));
             string result = await httpResponseMessage.Content.ReadAsStringAsync();
-            await using (StreamWriter writer = new StreamWriter($"{BackupLocation}\\{hash}"))
+
+            if (httpResponseMessage.IsSuccessStatusCode)
             {
+                await using StreamWriter writer = new StreamWriter($"{BackupLocation}\\{hash}");
                 await writer.WriteAsync(result);
             }
+            
 
             return StatusCode((int) httpResponseMessage.StatusCode, result);
         }
