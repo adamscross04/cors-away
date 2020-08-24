@@ -22,12 +22,11 @@ namespace CorsAway.Controllers
             string hash = GetSha256(url);
 
             string fileName = $"{BackupLocation}\\{hash}";
-            
+
             if (System.IO.File.Exists(fileName))
             {
-                
                 FileInfo fileInfo = new FileInfo(fileName);
-                
+
                 if (fileInfo.CreationTime >= DateTime.Now.Subtract(TimeSpan.FromMinutes(5)))
                 {
                     string contents = System.IO.File.ReadAllText($"{BackupLocation}\\{hash}");
@@ -37,17 +36,20 @@ namespace CorsAway.Controllers
                 System.IO.File.Delete(fileName);
             }
 
-            HttpResponseMessage httpResponseMessage = await GetSuccessResponseAndCache(url, fileName);
+
+            int tryCount = 0;
+
+            HttpResponseMessage httpResponseMessage = await GetSuccessResponseAndCache(url, fileName, tryCount);
             string result = await httpResponseMessage.Content.ReadAsStringAsync();
             return StatusCode((int) httpResponseMessage.StatusCode, result);
         }
 
-        private async Task<HttpResponseMessage> GetSuccessResponseAndCache(string url, string fileName)
+        private async Task<HttpResponseMessage> GetSuccessResponseAndCache(string url, string fileName, int tryCount)
         {
             HttpClient httpClient = new HttpClient();
 
             HttpResponseMessage httpResponseMessage = await httpClient.GetAsync(new Uri(url));
-            
+
             if (httpResponseMessage.IsSuccessStatusCode)
             {
                 await using StreamWriter writer = new StreamWriter(fileName);
@@ -56,9 +58,12 @@ namespace CorsAway.Controllers
             }
             else if (httpResponseMessage.StatusCode == HttpStatusCode.Forbidden)
             {
-                return await GetSuccessResponseAndCache(url, fileName);
+                if (++tryCount < 5)
+                {
+                    return await GetSuccessResponseAndCache(url, fileName, tryCount);
+                }
             }
-            
+
             return httpResponseMessage;
         }
 
