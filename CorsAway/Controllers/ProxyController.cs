@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using System.IO;
 using System.Linq;
+using System.Net;
 
 namespace CorsAway.Controllers
 {
@@ -36,19 +37,31 @@ namespace CorsAway.Controllers
                 System.IO.File.Delete(fileName);
             }
 
-            HttpClient httpClient = new HttpClient();
-            HttpResponseMessage httpResponseMessage = await httpClient.GetAsync(new Uri(url));
+            HttpResponseMessage httpResponseMessage = await GetSuccessResponseAndCache(url, fileName);
             string result = await httpResponseMessage.Content.ReadAsStringAsync();
-
-            if (httpResponseMessage.IsSuccessStatusCode)
-            {
-                await using StreamWriter writer = new StreamWriter($"{BackupLocation}\\{hash}");
-                await writer.WriteAsync(result);
-            }
-            
-
             return StatusCode((int) httpResponseMessage.StatusCode, result);
         }
+
+        private async Task<HttpResponseMessage> GetSuccessResponseAndCache(string url, string fileName)
+        {
+            HttpClient httpClient = new HttpClient();
+
+            HttpResponseMessage httpResponseMessage = await httpClient.GetAsync(new Uri(url));
+            
+            if (httpResponseMessage.IsSuccessStatusCode)
+            {
+                await using StreamWriter writer = new StreamWriter(fileName);
+                string result = await httpResponseMessage.Content.ReadAsStringAsync();
+                await writer.WriteAsync(result);
+            }
+            else if (httpResponseMessage.StatusCode == HttpStatusCode.Forbidden)
+            {
+                return await GetSuccessResponseAndCache(url, fileName);
+            }
+            
+            return httpResponseMessage;
+        }
+
 
         private string GetSha256(string randomString)
         {
